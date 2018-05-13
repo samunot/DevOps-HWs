@@ -1,0 +1,45 @@
+---
+- hosts: localhost
+  tasks:
+    - name: Add Nodesource Keys
+      become: yes
+      apt_key:
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+
+    - name: Add Nodesource Apt Sources
+      become: yes
+      apt_repository:
+        repo: '{{ item }}'
+        state: present
+      with_items:
+        - 'deb https://deb.nodesource.com/node_6.x xenial main'
+        - 'deb-src https://deb.nodesource.com/node_6.x xenial main'
+
+    - name: Install git and nodejs
+      become: yes
+      apt: 
+        "name={{ item }} state=present"
+      with_items:
+        - git
+        - nodejs
+
+    - name: Clone repo
+      git:
+        repo: "https://{{ lookup('env','gitusername') | urlencode }}:{{ lookup('env','gitpassword') | urlencode }}@github.ncsu.edu/samunot/provisioningServers.git"
+        clone: yes
+        dest: /home/vagrant/provisioningServers
+        force: yes
+
+    - name: Installing dependencies for "aws" nodejs file
+      npm:
+        path: /home/vagrant/provisioningServers/aws
+
+    - name: Installing dependencies for "droplet" nodejs file
+      npm:
+        path: /home/vagrant/provisioningServers/digitalocean
+
+    - name: Provision droplet
+      shell: cd /home/vagrant/provisioningServers/digitalocean && node main.js
+
+    - name: Provision aws
+      shell: cd /home/vagrant/provisioningServers/aws && node main.js

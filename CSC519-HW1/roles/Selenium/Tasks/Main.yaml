@@ -1,0 +1,54 @@
+    - name: Add Java Repo
+      apt_repository: repo='ppa:webupd8team/java'
+      
+    - name: Auto Accept Oracle JDK License
+      shell: echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
+      sudo: yes
+
+    - name: Install Oracle Java 8
+      apt: name={{item}} state=latest
+      with_items:
+        - oracle-java8-installer
+        - ca-certificates
+        - oracle-java8-set-default
+
+    - name: Install Git
+      apt: 
+        "name={{ item }} state=latest"
+      with_items:
+        - git
+
+    - name: Add Maven 3 repo
+      apt_repository: 
+        repo: ppa:andrei-pozolotin/maven3
+
+    - name: Install Maven 3
+      shell: apt-get update && apt-get install maven3
+
+    - name: Clone repo
+      git:
+        repo: "https://{{ lookup('env','gitusername') | urlencode }}:{{ lookup('env','gitpassword') | urlencode }}@github.com/CSC-326/Onboarding-Selenium.git"
+        clone: yes
+        dest: /home/vagrant/selenium
+        force: yes
+
+    - name: Add Server IP in WebTest.java 
+      replace:
+        path: /home/vagrant/selenium/src/src/test/java/selenium/tests/WebTest.java
+        regexp: 'localhost'
+        replace: '192.168.33.15'
+
+    - name: Install Google Driver
+      apt: deb=https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+
+    - name: Update New Line
+      lineinfile:
+        dest: /home/vagrant/selenium/src/src/test/java/selenium/tests/WebTest.java 
+        regexp: 'headless'
+        line: 'options.addArguments( "headless" ); options.addArguments( "no-sandbox");'
+
+    - pause:
+        minutes: 1
+
+    - name: Run Maven Test
+      shell: cd /home/vagrant/selenium/src && mvn test

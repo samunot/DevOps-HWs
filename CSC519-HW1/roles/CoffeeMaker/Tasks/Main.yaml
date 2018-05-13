@@ -1,0 +1,78 @@
+    - name: Add Java Repo
+      apt_repository: repo='ppa:webupd8team/java'
+      
+    - name: Auto Accept Oracle JDK License
+      shell: echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
+      sudo: yes
+
+    - name: Install Oracle Java 8
+      apt: name={{item}} state=latest
+      with_items:
+        - oracle-java8-installer
+        - ca-certificates
+        - oracle-java8-set-default
+
+    - name: Install git and maven
+      apt: 
+        "name={{ item }} state=present"
+      with_items:
+        - git
+        - maven
+
+    - name: Add MySQL Apt Key
+      apt_key:
+        keyserver: pgpkeys.mit.edu
+        id: 5072E1F5
+        
+    - name: Add MySQL repository
+      apt_repository: 
+        repo: deb http://repo.mysql.com/apt/ubuntu/ trusty mysql-5.7    
+
+    - name: Set root Password
+      debconf:
+        name: mysql-community-server
+        question: 'mysql-community-server/root-pass'
+        value: '{{ mysql_pass }}' 
+        vtype: password
+
+    - name: Set root Password Again
+      debconf:
+        name: mysql-community-server
+        question: 'mysql-community-server/re-root-pass'
+        value: '{{ mysql_pass }}'
+        vtype: password
+
+    - name: Install MySQL 5.7
+      apt:
+        pkg: '{{ item }}'
+        state: present
+        update_cache: true
+      with_items:
+        - mysql-server
+
+    - name: Start MySQL
+      service:
+        name: mysql
+        state: started   
+
+    - name: Clone repo
+      git:
+        repo: "https://{{ lookup('env','gitusername') | urlencode }}:{{ lookup('env','gitpassword') | urlencode }}@github.ncsu.edu/engr-csc326-staff/Onboarding.git"
+        clone: yes
+        dest: /home/vagrant/coffee
+        force: yes
+
+    - name: Hibernate config file
+      copy:
+        src: /home/vagrant/coffee/env/templates/hibernate-template.cfg.xml
+        dest: /home/vagrant/coffee/CoffeeMaker/src/main/resources/hibernate.cfg.xml
+        remote_src: yes
+
+    - name: Add password in hibernate.cfg.xml
+      replace:
+        path: /home/vagrant/coffee/CoffeeMaker/src/main/resources/hibernate.cfg.xml
+        regexp: '\{\{[a-z_]+\}\}'
+        replace: '{{ mysql_pass }}' 
+
+    - name: Run Webapp
+      shell: cd /home/vagrant/coffee/CoffeeMaker && nohup mvn spring-boot:run &
